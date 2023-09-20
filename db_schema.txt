@@ -1,0 +1,28 @@
+CREATE TABLE Customer (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, age INTEGER NOT NULL, phone TEXT NOT NULL, country TEXT NOT NULL, address TEXT NOT NULL, city TEXT NOT NULL);
+CREATE TABLE sqlite_sequence(name,seq);
+CREATE TABLE IF NOT EXISTS 'Order' (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, customerId INTEGER NOT NULL, totalPrice REAL NOT NULL, deliveryAddress TEXT NOT NULL, status TEXT NOT NULL, FOREIGN KEY(customerId) REFERENCES Customer(id) ON UPDATE CASCADE ON DELETE CASCADE);
+CREATE TABLE Supplier (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, phone TEXT NOT NULL, country TEXT NOT NULL, city TEXT NOT NULL, address TEXT NOT NULL);
+CREATE TABLE Product (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, supplierId INTEGER NOT NULL, name TEXT NOT NULL, price REAL NOT NULL, discount REAL NOT NULL, FOREIGN KEY (supplierId) REFERENCES Supplier(id) ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE TABLE OrderProduct (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, productId INTEGER NOT NULL, orderId INTEGER NOT NULL, quantity INTEGER NOT NULL, FOREIGN KEY (productId) REFERENCES Product(id) ON DELETE CASCADE ON UPDATE CASCADE, FOREIGN KEY (orderId) REFERENCES 'Order'(id) ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE TRIGGER update_order_price_on_insert
+before insert on OrderProduct
+begin
+update 'Order'
+SET totalPrice = totalPrice + (SELECT new.quantity * pp.price * (1 - pp.discount / 100) FROM Product as pp WHERE pp.id = new.productId) WHERE new.orderId = id;
+END;
+CREATE TRIGGER update_order_price_on_update
+before update on OrderProduct
+begin
+update 'Order' set totalPrice = totalPrice - (select old.quantity * pp.price * (1 - pp.discount / 100) from Product as pp where pp.id = old.productId) where old.orderId = id;
+update 'Order' set totalPrice = totalPrice + (select new.quantity * pp.price * (1 - pp.discount / 100) from Product as pp where pp.id = new.productId) where new.orderId = id;
+END;
+CREATE TRIGGER update_order_product_on_delete
+before delete on OrderProduct
+begin
+update 'Order' set totalPrice = totalPrice - (select old.quantity * pp.price * (1 - pp.discount / 100) from Product as pp where pp.id = old.productId) where old.orderId = id;
+end;
+CREATE TRIGGER update_order_price_before_product_delete
+before delete on Product
+begin
+delete from OrderProduct where productId = old.id;
+end;
